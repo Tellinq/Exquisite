@@ -1,27 +1,27 @@
-import QtQuick 2.5
-import QtQuick.Controls 2.5
-import QtQuick.Layouts 1.0
-import Qt.labs.folderlistmodel 2.15
-import org.kde.plasma.core 2.0 as PlasmaCore
-import org.kde.plasma.components 3.0 as PlasmaComponents
-import org.kde.kwin 2.0
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Qt.labs.folderlistmodel
+import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.components as PlasmaComponents
+import org.kde.kwin
+import org.kde.kirigami as Kirigami
 
 import "./"
 
 PlasmaComponents.Button {
     id: root
-    implicitWidth: 160*1.2 * PlasmaCore.Units.devicePixelRatio
-    implicitHeight: 90*1.2 * PlasmaCore.Units.devicePixelRatio
+    implicitWidth: 160*1.2 * Kirigami.Units.devicePixelRatio
+    implicitHeight: 90*1.2 * Kirigami.Units.devicePixelRatio
 
     property var main
-
     property var windows
     property var screen
     property var clickedWindows: []
 
     function tileWindow(client, window, root) {
         var screen = root.screen;
-        if (screen == undefined) { root.main.debug("Screen not defined"); return; }
+        if (screen == undefined) { console.log("screen not defined"); return; }
         if (!client.normalWindow) return;
         if (root.main.rememberWindowGeometries && !root.main.oldWindowGemoetries.has(client)) root.main.oldWindowGemoetries.set(client, [client.geometry.width, client.geometry.height]);
 
@@ -40,15 +40,10 @@ PlasmaComponents.Button {
         client.setMaximize(false, false);
         client.geometry = Qt.rect(screen.x + x, screen.y + y, width, height);
         if (root.main.hideTiledWindowTitlebar) client.noBorder = true;
-
-        if (root.main.hideOnFirstTile) {
-            root.main.debug("Hiding dialog in WindowLayout.tileWindow.  hideOnFirstTile:", hideOnFirstTile)
-            root.main.hide();
-        }
     }
 
     function childHasFocus() {
-        if (focus) return true;
+        if (root.focus) return true;
         for (let i = 0; i < repeater.count; i++) {
             let item = repeater.itemAt(i);
             if (item.focus) return true;
@@ -57,13 +52,13 @@ PlasmaComponents.Button {
     }
 
     onClicked: {
-        root.main.doRaise(true);
+        main.doRaise(true);
 
         if (tileAvailableWindowsOnBackgroundClick) {
             let clientList = [];
-            for (let i = 0; i < workspace.clientList().length; i++) {
-                let client = workspace.clientList()[i];
-                if (client.normalWindow && workspace.currentDesktop === client.desktop && !client.minimized)
+            for (let i = 0; i < Workspace.clientList().length; i++) {
+                let client = Workspace.clientList()[i];
+                if (client.normalWindow && Workspace.currentDesktop === client.desktop && !client.minimized)
                     clientList.push(client);
             }
 
@@ -71,18 +66,21 @@ PlasmaComponents.Button {
                 if (i >= windows.length || i >= clientList.length) return;
                 let client = clientList[i];
                 tileWindow(client, windows[i], root);
-                workspace.activeClient = client;
+                Workspace.activeClient = client;
             }
 
-            if (hideOnFirstTile || hideOnLayoutTiled) {
-                root.main.debug("Hiding dialog in WindowLayout.onClicked.  hideonFirstTile:", hideOnFirstTile, ", hideOnLayoutTiled:", hideOnLayoutTiled)
-                root.main.hide();
-            }
+            if (hideOnFirstTile || hideOnLayoutTiled) main.hide();
         }
     }
 
     function spanCheck(normal, raw, screenSize) {
-        return raw != undefined ? Math.round(Math.min(raw / (screenSize / 12.0), 12.0)) : normal;
+        if (raw != undefined) {
+            let val = Math.min(raw / (screenSize / 12.0), 12.0)
+            val = Math.round(val);
+            return val;
+        } else {
+            return normal;
+        }
     }
 
     SpanGridLayout {
@@ -113,28 +111,24 @@ PlasmaComponents.Button {
                         return out;
                     } else return "";
                 }
-                Layout.column: spanCheck(windows[index].x, windows[index].rawX, screen.width);
-                Layout.row: spanCheck(windows[index].y, windows[index].rawY, screen.height);
-                Layout.rowSpan: spanCheck(windows[index].width, windows[index].rawWidth, screen.width);
-                Layout.columnSpan: spanCheck(windows[index].height, windows[index].rawHeight, screen.height);
+                Layout.column: { root.spanCheck(windows[index].x, windows[index].rawX, screen.width); }
+                Layout.row: { root.spanCheck(windows[index].y, windows[index].rawY, screen.height); }
+                Layout.rowSpan: { root.spanCheck(windows[index].width, windows[index].rawWidth, screen.width); }
+                Layout.columnSpan: { root.spanCheck(windows[index].height, windows[index].rawHeight, screen.height); }
 
                 onClicked: {
-                    root.main.doRaise(true);
-                    root.main.requestActivate();
+                    main.doRaise(true);
+                    main.requestActivate();
                     focusField.forceActiveFocus();
 
-                    tileWindow(root.main.activeClient, windows[index], root);
+                    tileWindow(main.activeClient, windows[index], root);
 
                     if (!clickedWindows.includes(windows[index])) clickedWindows.push(windows[index]);
 
-                    if (hideOnFirstTile) {
-                        root.main.debug("Hiding dialog in WindowLayout.SpanGridLayout.Repeater.Button.onClicked.  hideonFirstTile:", hideOnFirstTile)
-                        root.main.hide();
-                    }
+                    if (hideOnFirstTile) main.hide();
                     if (hideOnLayoutTiled && clickedWindows.length === windows.length) {
-                        root.main.debug("Hiding dialog in WindowLayout.SpanGridLayout.Repeater.Button.onClicked.  hideOnLayoutTiled:", hideOnLayoutTiled)
                         clickedWindows = [];
-                        root.main.hide();
+                        main.hide();
                     }
                 }
 
@@ -144,14 +138,14 @@ PlasmaComponents.Button {
                     // Register shortcuts
                     if (window.shortcutKey) {
                         let key = [window.shortcutModifier, window.shortcutKey];
-                        root.main.tileShortcuts.set(key, function(workspace, window, tileWindow, root) {
+                        main.tileShortcuts.set(key, function(Workspace, window, tileWindow, root) {
                             return function() {
-                                if (window == undefined || root == undefined || workspace == undefined || root.main == undefined || root.main.activeClient == undefined) {
+                                if (window == undefined || root == undefined || Workspace == undefined || main == undefined || main.activeClient == undefined) {
                                     return;
                                 }
-                                tileWindow(root.main.activeClient, window, root);
+                                tileWindow(main.activeClient, window, root);
                             }
-                        }(workspace, window, tileWindow, root));
+                        }(Workspace, window, tileWindow, root));
                     }
                 }
             }

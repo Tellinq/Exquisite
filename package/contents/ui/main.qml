@@ -1,28 +1,29 @@
-import QtQuick 2.0
-import QtQuick.Layouts 1.3
-import Qt.labs.folderlistmodel 2.15
-import org.kde.plasma.core 2.0 as PlasmaCore
-import org.kde.plasma.components 3.0 as PlasmaComponents
-import org.kde.kwin 2.0
-import org.kde.kirigami 2.20 as Kirigami
+import QtQuick
+import QtQuick.Layouts
+import Qt.labs.folderlistmodel
+import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.components as PlasmaComponents
+import org.kde.plasma.plasma5support as Plasma5Support
+import org.kde.kwin
+import org.kde.kirigami as Kirigami
+import org.kde.ksvg as KSvg
 
 import "lib"
 
 PlasmaCore.Dialog {
     id: mainDialog
     location: PlasmaCore.Types.Floating
-    flags: Qt.X11BypassWindowManagerHint | Qt.FramelessWindowHint
+    type: PlasmaCore.Dialog.OnScreenDisplay
+    flags: Qt.X11BypassWindowManagerHint | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Popup
     visible: false
 
     property var activeClient
     property var screen
 
-    property bool debugEnabled: false
     property int columns: 5
     property int position: 1
     property double tileScale: 1.3
-    property bool showLayoutNames: false
-    property bool layoutNamesAbove: false
+    property bool nameAbove: false
     property bool headerVisible: true
     property bool activeWindowLabelVisible: true
     property bool restartButtonVisible: true
@@ -42,17 +43,11 @@ PlasmaCore.Dialog {
     // So if we detect that we are likely on Wayland, disable it going forward.
     property bool suppressRaise: false
 
-    function debug(...args) {
-        if (debugEnabled) console.log(...args);
-    }
-
     function loadConfig(){
-        debugEnabled = KWin.readConfig("debug", false);
         columns = KWin.readConfig("columns", 5);
         position = KWin.readConfig("position", 1);
         tileScale = KWin.readConfig("tileScale", 1.3);
-        showLayoutNames = KWin.readConfig("showLayoutNames", false);
-        layoutNamesAbove = KWin.readConfig("layoutNamesAbove", false);
+        nameAbove = KWin.readConfig("nameAbove", false);
         headerVisible = KWin.readConfig("showHeader", true);
         activeWindowLabelVisible = KWin.readConfig("showActiveWindowLabel", true);
         restartButtonVisible = KWin.readConfig("showRestartButton", true);
@@ -68,25 +63,26 @@ PlasmaCore.Dialog {
 
     function show() {
         // Get the current screen.
-        mainDialog.screen = workspace.clientArea(KWin.MaximizeArea, workspace.activeScreen, workspace.currentDesktop);
+        mainDialog.screen = Workspace.clientArea(KWin.FullScreenArea, Workspace.activeScreen, Workspace.currentDesktop);
         var screen = mainDialog.screen
 
-        debug("Showing dialog on screen ", workspace.activeScreen, ", desktop ", workspace.currentDesktop, ", size ", screen.height, "x", screen.width);
-
-        // HACK: Refresh layoutsRepeater model to regenerate all of it's children
+        // We want layoutsRepeater to regenerate all of it's children.
+        // To make that happen, we save the model it is using, set the model to
+        // undefined, and then restore the model.
+        // It's a hack, but it works.
         var model = layoutsRepeater.model;
         layoutsRepeater.model = undefined;
         layoutsRepeater.model = model;
 
-        focusTimer.running = true;
+        // focusTimer.running = true;
 
-        activeClient = workspace.activeClient;
+        activeClient = Workspace.activeWindow;
 
         mainDialog.visible = true;
 
         mainDialog.doRaise(true);
 
-        switch (position) {
+        switch (4) {
             case 0:
                 mainDialog.x = screen.x + screen.width/2 - mainDialog.width/2;
                 mainDialog.y = screen.y;
@@ -100,50 +96,56 @@ PlasmaCore.Dialog {
                 mainDialog.y = screen.y + screen.height - mainDialog.height;
                 break;
             case 3:
-                if (workspace.cursorPos.x > screen.x + screen.width - mainDialog.width/2)
-                    mainDialog.x = workspace.cursorPos.x - mainDialog.width;
-                else if (workspace.cursorPos.x < screen.x + mainDialog.width/2)
-                    mainDialog.x = workspace.cursorPos.x;
+                if (Workspace.cursorPos.x > screen.x + screen.width - mainDialog.width/2)
+                    mainDialog.x = Workspace.cursorPos.x - mainDialog.width;
+                else if (Workspace.cursorPos.x < screen.x + mainDialog.width/2)
+                    mainDialog.x = Workspace.cursorPos.x;
                 else
-                    mainDialog.x = workspace.cursorPos.x - mainDialog.width/2;
+                    mainDialog.x = Workspace.cursorPos.x - mainDialog.width/2;
 
-                if (workspace.cursorPos.y > screen.y + screen.height - mainDialog.height/2)
-                    mainDialog.y = workspace.cursorPos.y - mainDialog.height;
-                else if (workspace.cursorPos.y < screen.y + mainDialog.height/2)
-                    mainDialog.y = workspace.cursorPos.y;
+                if (Workspace.cursorPos.y > screen.y + screen.height - mainDialog.height/2)
+                    mainDialog.y = Workspace.cursorPos.y - mainDialog.height;
+                else if (Workspace.cursorPos.y < screen.y + mainDialog.height/2)
+                    mainDialog.y = Workspace.cursorPos.y;
                 else
-                    mainDialog.y = workspace.cursorPos.y - mainDialog.height/2;
+                    mainDialog.y = Workspace.cursorPos.y - mainDialog.height/2;
                 break;
         }
     }
 
     function hide() {
-        debug("Hiding dialog");
         focusTimer.running = false;
         mainDialog.visible = false;
         mainDialog.tileShortcuts.clear();
     }
 
     function checkRaise() {
-        if (suppressRaise) return;
-        // HACK: Suppress raise on Wayland
-        // A bug showed that on Wayland, workspace.activeClient is useful, but on X11 that is not the case.
-        if (mainDialog.activeClient != undefined && workspace.activeClient != undefined) {
+        if (suppressRaise) {
+            return;
+        }
+        // This is a horrible hack.
+        // But a bug showed that on Wayland, Workspace.activeClient is useful, but on X11 that is not the case.
+        // And we want to suppress Raise on Wayland.
+        if (mainDialog.activeClient != undefined && Workspace.activeClient != undefined) {
             suppressRaise = true;
         }
     }
 
     function doRaise(forceActiveFocus) {
         checkRaise();
-        if (!suppressRaise) mainDialog.raise();
+        if (!suppressRaise) {
+            mainDialog.raise();
+        }
         mainDialog.requestActivate();
-        if (forceActiveFocus) focusField.forceActiveFocus();
+        if (forceActiveFocus) {
+            focusField.forceActiveFocus();
+        }
     }
 
     ColumnLayout {
         id: mainColumnLayout
 
-        PlasmaCore.DataSource {
+        Plasma5Support.DataSource {
             id: command
             engine: "executable"
             connectedSources: []
@@ -151,7 +153,6 @@ PlasmaCore.Dialog {
                 disconnectSource(sourceName);
             }
             function exec() {
-                debug("Restarting KWin");
                 mainDialog.hide();
                 connectSource(`bash ${Qt.resolvedUrl("./").replace(/^(file:\/{2})/,"")}restartKWin.sh`);
             }
@@ -167,12 +168,12 @@ PlasmaCore.Dialog {
 
             Item { Layout.fillWidth: true }
 
-            PlasmaCore.FrameSvgItem {
+            KSvg.FrameSvgItem {
                 width: 22
                 height: width
                 visible: activeWindowLabelVisible
 
-                PlasmaCore.IconItem {
+                Kirigami.Icon {
                     anchors.fill: parent
                     source: activeClient ? activeClient.icon : ""
                 }
@@ -199,7 +200,6 @@ PlasmaCore.Dialog {
                 icon.name: "dialog-close"
                 flat: true
                 onClicked: {
-                    debug("Close button clicked");
                     mainDialog.hide();
                 }
             }
@@ -229,14 +229,13 @@ PlasmaCore.Dialog {
 
                 ColumnLayout {
                     id: column
-
                     function childHasFocus() {
                         return layout.childHasFocus();
                     }
 
                     PlasmaComponents.Label {
                         id: labelTop
-                        visible: showLayoutNames && layoutNamesAbove
+                        visible: nameAbove
                         text: layoutFile.item.name
                         color: Kirigami.Theme.disabledTextColor
                         width: layout.width
@@ -254,15 +253,15 @@ PlasmaCore.Dialog {
                         windows: layoutFile.item.windows
                         screen: {
                             if (layoutFile.item.screen != undefined) {
-                                if (layoutFile.item.screen < workspace.numScreens) {
-                                    return workspace.clientArea(KWin.MaximizeArea, layoutFile.item.screen, workspace.currentDesktop);
+                                if (layoutFile.item.screen < Workspace.numScreens) {
+                                    return Workspace.clientArea(KWin.MaximizeArea, layoutFile.item.screen, Workspace.currentDesktop);
                                 } else {
-                                    return workspace.clientArea(KWin.MaximizeArea, 0, workspace.currentDesktop);
+                                    return Workspace.clientArea(KWin.MaximizeArea, 0, Workspace.currentDesktop);
                                 }
                             } else if (mainDialog.screen != undefined) {
                                 return mainDialog.screen;
                             } else {
-                                return workspace.clientArea(KWin.MaximizeArea, 0, workspace.currentDesktop);
+                                return Workspace.clientArea(KWin.FullScreenArea, Workspace.activeScreen, Workspace.currentDesktop);
                             }
                         }
                         main: mainDialog
@@ -270,7 +269,7 @@ PlasmaCore.Dialog {
 
                     PlasmaComponents.Label {
                         id: labelBottom
-                        visible: showLayoutNames && !layoutNamesAbove
+                        visible: !nameAbove
                         text: layoutFile.item.name
                         color: Kirigami.Theme.disabledTextColor
                         width: layout.width
@@ -281,7 +280,7 @@ PlasmaCore.Dialog {
             }
         }
 
-        // HACK: This item handles focus related actions
+        // This item is a "hack" to handle focus related actions
         PlasmaComponents.TextField {
             id: focusField
             visible: false
@@ -290,10 +289,7 @@ PlasmaCore.Dialog {
                 mainDialog.doRaise(false);
             }
 
-            Keys.onEscapePressed: {
-                debug("Escape pressed");
-                mainDialog.hide();
-            }
+            Keys.onEscapePressed: mainDialog.hide()
             Keys.onPressed: {
                 tileShortcuts.forEach((tileFunction, key) => {
                     let shortcutModifier = key[0] ? key[0] : Qt.NoModifier;
@@ -306,23 +302,21 @@ PlasmaCore.Dialog {
         }
 
         Connections {
-            target: workspace
-            function onClientActivated(client) {
-                if (!client) return;
-                if (hideOnDesktopClick && workspace.activeClient.desktopWindow) {
-                    mainDialog.debug("In onClientActive, hiding due to desktop click");
+            target: Workspace
+            function onWindowActivated(window) {
+                if (!window) return;
+                if (hideOnDesktopClick && Workspace.activeWindow.desktopWindow)
                     mainDialog.hide();
-                }
 
-                activeClient = workspace.activeClient;
+                activeClient = Workspace.activeWindow;
             }
         }
 
         Connections {
-            target: workspace.activeClient
+            target: activeClient ?? Workspace.activeWindow
             function onMoveResizedChanged() {
                 if (rememberWindowGeometries) {
-                    let focusedWindow = workspace.activeClient;
+                    let focusedWindow = Workspace.activeWindow;
 
                     if (oldWindowGemoetries.has(focusedWindow)) {
                         let newSize = oldWindowGemoetries.get(focusedWindow);
@@ -331,7 +325,7 @@ PlasmaCore.Dialog {
                     }
                 }
 
-                if (hideTiledWindowTitlebar) workspace.activeClient.noBorder = false;
+                if (hideTiledWindowTitlebar) Workspace.activeWindow.noBorder = false;
             }
         }
 
@@ -350,25 +344,42 @@ PlasmaCore.Dialog {
     }
 
     Component.onCompleted: {
-        options.configChanged.connect(mainDialog.loadConfig);
-        KWin.registerWindow(mainDialog);
-        KWin.registerShortcut(
+        Options.configChanged.connect(mainDialog.loadConfig);
+        // KWin.registerWindow(mainDialog);
+        /*registerShortcut(
             "Exquisite",
             "Exquisite",
             "Ctrl+Alt+D",
             function() {
                 if (mainDialog.visible) {
-                    debug("Shortcut triggered while shown");
                     mainDialog.hide();
                 } else {
-                    debug("Hiding dialog before showing");
                     mainDialog.hide();
-                    options.configChanged();
+                    Options.configChanged();
                     mainDialog.show();
                 }
             }
-        );
+        );*/
 
         mainDialog.loadConfig();
+    }
+
+    Item {
+        id: shortcuts
+
+        ShortcutHandler {
+            name: "Exquisite"
+            text: "Toogle Exquisite"
+            sequence: "Ctrl+Alt+D"
+            onActivated: {
+                if (mainDialog.visible) {
+                    mainDialog.hide();
+                } else {
+                    mainDialog.hide();
+                    Options.configChanged();
+                    mainDialog.show();
+                }
+            }
+        }
     }
 }
