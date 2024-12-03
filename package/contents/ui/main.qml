@@ -82,7 +82,7 @@ PlasmaCore.Dialog {
 
         mainDialog.doRaise(true);
 
-        switch (4) {
+        switch (position) {
             case 0:
                 mainDialog.x = screen.x + screen.width/2 - mainDialog.width/2;
                 mainDialog.y = screen.y;
