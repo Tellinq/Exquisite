@@ -1,0 +1,24 @@
+{
+  "KPackageStructure": "KWin/Script",
+  "KPlugin": {
+    "Name": "Exquisite",
+    "Description": "Easy window layout management for KDE Plasma",
+    "EnabledByDefault": true,
+    "Icon": "preferences-desktop-virtual",
+
+    "Authors": [
+      {
+        "Name": "qewer33"
+      }
+    ],
+    "Id": "exquisite",
+    "Version": "0.6",
+    "License": "GPL-3.0+",
+    "Website": "https://www.qewer.dev"
+  },
+  "X-Plasma-API": "declarativescript",
+  "X-Plasma-API-Minimum-Version": "6.0",
+  "X-Plasma-MainScript": "ui/main.qml",
+  "X-KDE-ConfigModule": "kwin/effects/configs/kcm_kwin4_genericscripted",
+  "X-KDE-PluginKeyword": "exquisite"
+}
