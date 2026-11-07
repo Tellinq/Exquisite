@@ -11,9 +11,9 @@ prompt() {
     done
 }
 
-PACKAGE_NAME=$(kreadconfig5 --file="${PWD}/package/metadata.desktop" --group="Desktop Entry" --key="X-KDE-PluginInfo-Name")
+PACKAGE_NAME=$(jq -r .KPlugin.Id package/metadata.json)
 
-zip -r "${PACKAGE_NAME}.kwinscript" "package"
+(cd package && zip -r "../${PACKAGE_NAME}.kwinscript" .)
 
 prompt "Do you want to commit and push the changes to the git repository?" && \
 git add . && \

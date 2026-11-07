@@ -1,20 +1,17 @@
 #!/usr/bin/env bash
 
-PACKAGE_NAME=$(kreadconfig5 --file="${PWD}/package/metadata.desktop" --group="Desktop Entry" --key="X-KDE-PluginInfo-Name")
-INSTALL_LOCATION="${HOME}/.local/share/kwin/scripts/"
+PACKAGE_NAME=$(jq -r .KPlugin.Id package/metadata.json)
 
-echo "Installing PACKAGE_NAME"
-
-if [ ! -d "${INSTALL_LOCATION}" ]; then
-    mkdir -p "${INSTALL_LOCATION}${PACKAGE_NAME}"
-else
-    echo "Skipping directory creation: directory exists"
-fi
+echo "Installing ${PACKAGE_NAME}"
 
 cd widget
 ./install.sh
 cd ..
 
-cp -R "package/." "${INSTALL_LOCATION}${PACKAGE_NAME}/" &&
-echo "Successfully installed ${PACKAGE_NAME} to ${INSTALL_LOCATION}" ||
+if kpackagetool6 --type=KWin/Script --show "${PACKAGE_NAME}" > /dev/null 2>&1; then
+    kpackagetool6 --type=KWin/Script --upgrade package
+else
+    kpackagetool6 --type=KWin/Script --install package
+fi &&
+echo "Successfully installed ${PACKAGE_NAME}" ||
 echo "Installation failed"

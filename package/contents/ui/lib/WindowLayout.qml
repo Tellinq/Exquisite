@@ -11,8 +11,8 @@ import "./"
 
 PlasmaComponents.Button {
     id: root
-    implicitWidth: 160*1.2 * Kirigami.Units.devicePixelRatio
-    implicitHeight: 90*1.2 * Kirigami.Units.devicePixelRatio
+    implicitWidth: 160*1.2
+    implicitHeight: 90*1.2
 
     property var main
     property var windows
@@ -23,7 +23,7 @@ PlasmaComponents.Button {
         var screen = root.screen;
         if (screen == undefined) { console.log("screen not defined"); return; }
         if (!client.normalWindow) return;
-        if (root.main.rememberWindowGeometries && !root.main.oldWindowGemoetries.has(client)) root.main.oldWindowGemoetries.set(client, [client.geometry.width, client.geometry.height]);
+        if (root.main.rememberWindowGeometries && !root.main.oldWindowGemoetries.has(client)) root.main.oldWindowGemoetries.set(client, [client.frameGeometry.width, client.frameGeometry.height]);
 
         let xMult = screen.width / 12.0;
         let yMult = screen.height / 12.0;
@@ -32,13 +32,14 @@ PlasmaComponents.Button {
         let width = 0.0;
         let height = 0.0;
 
+        let tileGap = root.main.tileGap;
         x = window.rawX ?? Math.round(window.x * xMult) + tileGap;
         y = window.rawY ?? Math.round(window.y * yMult) + tileGap;
         width = window.rawWidth ?? Math.round(window.width * xMult) - 2*tileGap;
         height = window.rawHeight ?? Math.round(window.height * yMult) - 2*tileGap;
 
         client.setMaximize(false, false);
-        client.geometry = Qt.rect(screen.x + x, screen.y + y, width, height);
+        client.frameGeometry = Qt.rect(screen.x + x, screen.y + y, width, height);
         if (root.main.hideTiledWindowTitlebar) client.noBorder = true;
     }
 
@@ -54,22 +55,18 @@ PlasmaComponents.Button {
     onClicked: {
         main.doRaise(true);
 
-        if (tileAvailableWindowsOnBackgroundClick) {
-            let clientList = [];
-            for (let i = 0; i < Workspace.clientList().length; i++) {
-                let client = Workspace.clientList()[i];
-                if (client.normalWindow && Workspace.currentDesktop === client.desktop && !client.minimized)
-                    clientList.push(client);
-            }
+        if (main.tileAvailableWindowsOnBackgroundClick) {
+            let clientList = Workspace.windowList().filter(client =>
+                client.normalWindow && !client.minimized &&
+                (client.onAllDesktops || client.desktops.includes(Workspace.currentDesktop)));
 
-            for (let i = 0; i < clientList.length; i++) {
-                if (i >= windows.length || i >= clientList.length) return;
+            for (let i = 0; i < Math.min(clientList.length, windows.length); i++) {
                 let client = clientList[i];
                 tileWindow(client, windows[i], root);
-                Workspace.activeClient = client;
+                Workspace.activeWindow = client;
             }
 
-            if (hideOnFirstTile || hideOnLayoutTiled) main.hide();
+            if (main.hideOnFirstTile || main.hideOnLayoutTiled) main.hide();
         }
     }
 
@@ -118,15 +115,13 @@ PlasmaComponents.Button {
 
                 onClicked: {
                     main.doRaise(true);
-                    main.requestActivate();
-                    focusField.forceActiveFocus();
 
                     tileWindow(main.activeClient, windows[index], root);
 
                     if (!clickedWindows.includes(windows[index])) clickedWindows.push(windows[index]);
 
-                    if (hideOnFirstTile) main.hide();
-                    if (hideOnLayoutTiled && clickedWindows.length === windows.length) {
+                    if (main.hideOnFirstTile) main.hide();
+                    if (main.hideOnLayoutTiled && clickedWindows.length === windows.length) {
                         clickedWindows = [];
                         main.hide();
                     }

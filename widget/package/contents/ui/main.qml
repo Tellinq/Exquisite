@@ -3,34 +3,32 @@
     SPDX-License-Identifier: GPL-3.0-or-later
 */
 
-import QtQuick 2.12
-import QtQuick.Layouts 1.12
-import QtGraphicalEffects 1.12
+import QtQuick
 
-import org.kde.plasma.core 2.0 as PlasmaCore
-import org.kde.plasma.plasmoid 2.0
-import org.kde.plasma.components 3.0 as PlasmaComponents
-import org.kde.plasma.extras 2.0 as PlasmaExtras
+import org.kde.plasma.core as PlasmaCore
+import org.kde.plasma.plasmoid
+import org.kde.plasma.plasma5support as Plasma5Support
+import org.kde.kirigami as Kirigami
 
-Item {
+PlasmoidItem {
     id: root
 
-    Plasmoid.preferredRepresentation: Plasmoid.compactRepresentation
+    preferredRepresentation: compactRepresentation
     Plasmoid.backgroundHints: PlasmaCore.Types.ConfigurableBackground
 
-    Plasmoid.compactRepresentation: Item {
+    compactRepresentation: Item {
         MouseArea {
             anchors.fill: parent
             onClicked: command.exec()
         }
 
-        PlasmaCore.IconItem {
+        Kirigami.Icon {
             anchors.fill: parent
-            source: plasmoid.configuration.icon
+            source: Plasmoid.configuration.icon
         }
     }
 
-    PlasmaCore.DataSource {
+    Plasma5Support.DataSource {
         id: command
         engine: "executable"
         connectedSources: []
@@ -38,7 +36,7 @@ Item {
             disconnectSource(sourceName);
         }
         function exec() {
-            connectSource('qdbus org.kde.kglobalaccel /component/kwin invokeShortcut "Exquisite"');
+            connectSource('qdbus6 org.kde.kglobalaccel /component/kwin invokeShortcut "Exquisite"');
         }
     }
 }

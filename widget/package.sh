@@ -11,14 +11,6 @@ prompt() {
     done
 }
 
-get_project_name() {
-    line=$(grep "^Name" package/metadata.desktop)
-    IFS='='
-    read -ra array <<< "${line}"
-    projectname=${array[1]}
-    echo ${projectname}
-}
-
-PACKAGE_NAME=$(get_project_name)
+PACKAGE_NAME=$(jq -r .KPlugin.Name package/metadata.json)
 
 tar -czvf "${PACKAGE_NAME}.tar.gz" -C "package/" .

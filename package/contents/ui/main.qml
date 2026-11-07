@@ -40,8 +40,7 @@ PlasmaCore.Dialog {
     property var tileShortcuts: new Map()
 
     // On Wayland, all calling raise does is generate a warning message.
-    // So if we detect that we are likely on Wayland, disable it going forward.
-    property bool suppressRaise: false
+    property bool suppressRaise: Qt.platform.pluginName !== "xcb"
 
     function loadConfig(){
         columns = KWin.readConfig("columns", 5);
@@ -119,20 +118,7 @@ PlasmaCore.Dialog {
         mainDialog.tileShortcuts.clear();
     }
 
-    function checkRaise() {
-        if (suppressRaise) {
-            return;
-        }
-        // This is a horrible hack.
-        // But a bug showed that on Wayland, Workspace.activeClient is useful, but on X11 that is not the case.
-        // And we want to suppress Raise on Wayland.
-        if (mainDialog.activeClient != undefined && Workspace.activeClient != undefined) {
-            suppressRaise = true;
-        }
-    }
-
     function doRaise(forceActiveFocus) {
-        checkRaise();
         if (!suppressRaise) {
             mainDialog.raise();
         }
@@ -142,7 +128,7 @@ PlasmaCore.Dialog {
         }
     }
 
-    ColumnLayout {
+    mainItem: ColumnLayout {
         id: mainColumnLayout
 
         Plasma5Support.DataSource {
@@ -154,7 +140,7 @@ PlasmaCore.Dialog {
             }
             function exec() {
                 mainDialog.hide();
-                connectSource(`bash ${Qt.resolvedUrl("./").replace(/^(file:\/{2})/,"")}restartKWin.sh`);
+                connectSource(`bash ${Qt.resolvedUrl("./").replace(/^(file:\/{2})/,"")}reloadScript.sh`);
             }
         }
 
@@ -187,7 +173,7 @@ PlasmaCore.Dialog {
             Item { Layout.fillWidth: true }
 
             PlasmaComponents.Button {
-                text: "Restart KWin"
+                text: "Reload Exquisite"
                 icon.name: "view-refresh-symbolic"
                 visible: restartButtonVisible
                 onClicked: {
@@ -246,18 +232,16 @@ PlasmaCore.Dialog {
                     WindowLayout {
                         Loader {
                             id: layoutFile
-                            source: fileUrl
+                            // Query string bypasses the QML engine cache so layout edits apply without restarting KWin
+                            source: fileUrl + "?" + Date.now()
                         }
 
                         id: layout
                         windows: layoutFile.item.windows
                         screen: {
                             if (layoutFile.item.screen != undefined) {
-                                if (layoutFile.item.screen < Workspace.numScreens) {
-                                    return Workspace.clientArea(KWin.MaximizeArea, layoutFile.item.screen, Workspace.currentDesktop);
-                                } else {
-                                    return Workspace.clientArea(KWin.MaximizeArea, 0, Workspace.currentDesktop);
-                                }
+                                let output = Workspace.screens[layoutFile.item.screen] ?? Workspace.screens[0];
+                                return Workspace.clientArea(KWin.MaximizeArea, output, Workspace.currentDesktop);
                             } else if (mainDialog.screen != undefined) {
                                 return mainDialog.screen;
                             } else {
@@ -290,7 +274,7 @@ PlasmaCore.Dialog {
             }
 
             Keys.onEscapePressed: mainDialog.hide()
-            Keys.onPressed: {
+            Keys.onPressed: (event) => {
                 tileShortcuts.forEach((tileFunction, key) => {
                     let shortcutModifier = key[0] ? key[0] : Qt.NoModifier;
                     let shortcutKey = key[1];
@@ -305,10 +289,10 @@ PlasmaCore.Dialog {
             target: Workspace
             function onWindowActivated(window) {
                 if (!window) return;
-                if (hideOnDesktopClick && Workspace.activeWindow.desktopWindow)
+                if (hideOnDesktopClick && window.desktopWindow)
                     mainDialog.hide();
 
-                activeClient = Workspace.activeWindow;
+                activeClient = window;
             }
         }
 
@@ -320,12 +304,27 @@ PlasmaCore.Dialog {
 
                     if (oldWindowGemoetries.has(focusedWindow)) {
                         let newSize = oldWindowGemoetries.get(focusedWindow);
-                        focusedWindow.geometry = Qt.rect(focusedWindow.geometry.x, focusedWindow.geometry.y, newSize[0], newSize[1]);
+                        focusedWindow.frameGeometry = Qt.rect(focusedWindow.frameGeometry.x, focusedWindow.frameGeometry.y, newSize[0], newSize[1]);
                         oldWindowGemoetries.delete(focusedWindow);
                     }
                 }
 
                 if (hideTiledWindowTitlebar) Workspace.activeWindow.noBorder = false;
+            }
+        }
+
+        ShortcutHandler {
+            name: "Exquisite"
+            text: "Toggle Exquisite"
+            sequence: "Ctrl+Alt+D"
+            onActivated: {
+                if (mainDialog.visible) {
+                    mainDialog.hide();
+                } else {
+                    mainDialog.hide();
+                    mainDialog.loadConfig();
+                    mainDialog.show();
+                }
             }
         }
 
@@ -345,41 +344,7 @@ PlasmaCore.Dialog {
 
     Component.onCompleted: {
         Options.configChanged.connect(mainDialog.loadConfig);
-        // KWin.registerWindow(mainDialog);
-        /*registerShortcut(
-            "Exquisite",
-            "Exquisite",
-            "Ctrl+Alt+D",
-            function() {
-                if (mainDialog.visible) {
-                    mainDialog.hide();
-                } else {
-                    mainDialog.hide();
-                    Options.configChanged();
-                    mainDialog.show();
-                }
-            }
-        );*/
 
         mainDialog.loadConfig();
-    }
-
-    Item {
-        id: shortcuts
-
-        ShortcutHandler {
-            name: "Exquisite"
-            text: "Toogle Exquisite"
-            sequence: "Ctrl+Alt+D"
-            onActivated: {
-                if (mainDialog.visible) {
-                    mainDialog.hide();
-                } else {
-                    mainDialog.hide();
-                    Options.configChanged();
-                    mainDialog.show();
-                }
-            }
-        }
     }
 }

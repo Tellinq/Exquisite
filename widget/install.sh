@@ -1,24 +1,13 @@
- #!/usr/bin/env bash
+#!/usr/bin/env bash
 
-get_project_id() {
-    line=$(grep "^X-KDE-PluginInfo-Name" package/metadata.desktop)
-    IFS='='
-    read -ra array <<< "${line}"
-    projectid=${array[1]}
-    echo ${projectid}
-}
-
-PROJECT_ID=$(get_project_id)
-INSTALL_LOCATION="${HOME}/.local/share/plasma/plasmoids/"
+PROJECT_ID=$(jq -r .KPlugin.Id package/metadata.json)
 
 echo "Installing ${PROJECT_ID}"
 
-if [ ! -d "${INSTALL_LOCATION}" ]; then
-    mkdir "${INSTALL_LOCATION}${PROJECT_ID}"
+if kpackagetool6 --type=Plasma/Applet --show "${PROJECT_ID}" > /dev/null 2>&1; then
+    kpackagetool6 --type=Plasma/Applet --upgrade package
 else
-    echo "Skipping directory creation: directory exists"
-fi
-
-cp -R "package/." "${INSTALL_LOCATION}${PROJECT_ID}/" &&
-echo "Successfully installed ${PROJECT_ID} to ${INSTALL_LOCATION}/" ||
+    kpackagetool6 --type=Plasma/Applet --install package
+fi &&
+echo "Successfully installed ${PROJECT_ID}" ||
 echo "Installation failed"

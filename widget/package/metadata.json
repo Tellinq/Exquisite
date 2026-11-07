@@ -1,0 +1,20 @@
+{
+  "KPackageStructure": "Plasma/Applet",
+  "KPlugin": {
+    "Name": "Toggle Exquisite",
+    "Description": "Toggle the visibility of the Exquisite window",
+    "Icon": "preferences-desktop-virtual",
+    "Authors": [
+      {
+        "Name": "qewer33"
+      }
+    ],
+    "Category": "Utilities",
+    "EnabledByDefault": true,
+    "Id": "toggle-exquisite",
+    "Version": "0.2",
+    "License": "GPL-3.0+",
+    "Website": "https://www.qewer.dev"
+  },
+  "X-Plasma-API-Minimum-Version": "6.0"
+}
